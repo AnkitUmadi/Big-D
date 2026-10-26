@@ -1,0 +1,9 @@
+intersectional_group,age_group,race,gender,n_samples,base_rate,selection_rate,roc_auc,tpr_sensitivity,fnr_miss_rate,fpr,ece,brier_score
+Geriatric (65+) | Black | Male,Geriatric (65+),Black,Male,30,0.2333,0.2333,0.882,0.4286,0.5714,0.1739,0.1796,0.1183
+Middle Age (45-64) | Black | Male,Middle Age (45-64),Black,Male,33,0.3333,0.2727,0.876,0.5455,0.4545,0.1364,0.1161,0.127
+Middle Age (45-64) | White | Female,Middle Age (45-64),White,Female,94,0.2447,0.1915,0.8524,0.3478,0.6522,0.1408,0.1124,0.1287
+Geriatric (65+) | White | Male,Geriatric (65+),White,Male,98,0.2551,0.2857,0.8932,0.72,0.28,0.137,0.0879,0.1135
+Middle Age (45-64) | White | Male,Middle Age (45-64),White,Male,81,0.1605,0.0988,0.9106,0.3846,0.6154,0.0441,0.0666,0.0957
+Young Adult (18-44) | White | Male,Young Adult (18-44),White,Male,54,0.1852,0.0926,0.9477,0.4,0.6,0.0227,0.064,0.0698
+Young Adult (18-44) | White | Female,Young Adult (18-44),White,Female,78,0.1282,0.141,0.9632,0.7,0.3,0.0588,0.0556,0.0554
+Geriatric (65+) | White | Female,Geriatric (65+),White,Female,90,0.2889,0.2556,0.8888,0.6154,0.3846,0.1094,0.0427,0.1172

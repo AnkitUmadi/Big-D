@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  pipeline:
+    build: .
+    container_name: bdsrae_readmission_pipeline
+    volumes:
+      - ./data:/workspace/data
+      - ./reports:/workspace/reports
+      - ./models:/workspace/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: python run_pipeline.py --cohort_size 25000
+
+  jupyter:
+    build: .
+    container_name: bdsrae_readmission_jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/workspace
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token=''

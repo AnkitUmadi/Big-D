@@ -1,0 +1,76 @@
+# Configuration for Subgroup Performance in Healthcare Risk Models
+# Course: Big Data Systems & Responsible AI Engineering (BDSRAE) - PES University
+# Team: Ankith Umadi, Haneesh E, Vikas R
+
+project:
+  name: "subgroup-healthcare-readmission"
+  version: "1.0.0"
+  random_seed: 42
+
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  synthea_cohort_size: 30000
+  test_size: 0.20
+  val_size: 0.10
+  readmission_window_days: 30
+  parquet_partitions:
+    - "age_group"
+    - "race"
+
+spark:
+  app_name: "BDSRAE-Healthcare-Subgroup-Pipeline"
+  master: "local[*]"
+  driver_memory: "4g"
+  shuffle_partitions: 8
+  arrow_enabled: true
+
+features:
+  demographic_cols:
+    - "age"
+    - "gender"
+    - "race"
+    - "ethnicity"
+    - "age_group"
+  clinical_cols:
+    - "length_of_stay"
+    - "num_prior_inpatient"
+    - "num_prior_emergency"
+    - "num_prior_ambulatory"
+    - "comorbidity_count"
+    - "has_diabetes"
+    - "has_hypertension"
+    - "has_heart_failure"
+    - "has_copd"
+    - "has_ckd"
+    - "has_cad"
+    - "has_depression"
+    - "total_medications"
+    - "total_procedures"
+    - "total_claim_cost"
+  target_col: "readmission_30d"
+
+responsible_ai:
+  sensitive_attributes:
+    - "age_group"
+    - "gender"
+    - "race"
+  reference_groups:
+    age_group: "Young Adult (18-44)"
+    gender: "M"
+    race: "White"
+  fairness_metrics:
+    - "demographic_parity_difference"
+    - "demographic_parity_ratio"
+    - "equal_opportunity_difference"
+    - "false_positive_rate_difference"
+    - "expected_calibration_error"
+  calibration_n_bins: 10
+  mitigation_methods:
+    - "pre_processing_reweighing"
+    - "subgroup_isotonic_calibration"
+    - "threshold_optimization_equal_opportunity"
+
+benchmark:
+  scales: [5000, 10000, 20000, 40000]
+  partition_tests: [1, 2, 4, 8]
