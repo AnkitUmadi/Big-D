@@ -130,11 +130,18 @@ Evaluated across expanding patient cohorts ($5,000$, $10,000$, and $20,000$ synt
 | **1. README with Architecture & Setup** | [`README.md`](README.md) | Architectural diagrams, quantitative highlights, step-by-step setup guide. |
 | **2. Reproducible Pipeline** | [`run_pipeline.py`](run_pipeline.py), [`Dockerfile`](Dockerfile), [`docker-compose.yml`](docker-compose.yml) | Master CLI pipeline and container definitions for zero-friction reproduction. |
 | **3. Results Notebook** | [`notebooks/subgroup_risk_analysis.ipynb`](notebooks/subgroup_risk_analysis.ipynb) | Pre-executed interactive notebook with charts, markdown narrative, and outputs. |
-| **4. Technical Report (3–5 Pages)** | [`reports/technical_report.md`](reports/technical_report.md) | Formal academic conference-grade research paper. |
-| **5. Model Card & Data Card** | [`reports/model_card.md`](reports/model_card.md), [`reports/data_card.md`](reports/data_card.md) | Mitchell et al. Model Card with Intended Use & Gebru et al. Data Card. |
-| **6. 3-Minute Demo Video Script** | [`presentation/demo_video_script.md`](presentation/demo_video_script.md) | Turn-by-turn storyboard, timing, voiceover, and visual cues. |
+| **4. Technical Report (3–5 Pages)** | [📄 `reports/technical_report.pdf`](reports/technical_report.pdf), [`reports/technical_report.md`](reports/technical_report.md) | Formal academic conference-grade research paper (available in PDF & Markdown). |
+| **5. Model Card & Data Card** | [`MODEL_CARD.md`](MODEL_CARD.md), [`DATA_CARD.md`](DATA_CARD.md) | Mitchell et al. Model Card with Intended Use & Gebru et al. Data Card. |
+| **6. 3-Minute Demo Video Script & Link** | [`presentation/demo_video_script.md`](presentation/demo_video_script.md) | Turn-by-turn storyboard, timing, voiceover, and visual cues. |
 | **7. Capstone Presentation Deck Guide** | [`presentation/presentation_deck_outline.md`](presentation/presentation_deck_outline.md) | 8–10 minute slide-by-slide defense guide using the PESU Capstone template. |
 | **8. Clinical Subgroup Report** | [`reports/subgroup_disparity_report.md`](reports/subgroup_disparity_report.md) | Topic-specific deep-dive clinical failure and mitigation report. |
+
+---
+
+## 🎥 3-Minute Demo Video
+
+- **Video Walkthrough Script:** Full scene-by-scene script available at [`presentation/demo_video_script.md`](presentation/demo_video_script.md).
+- **Video Link:** [Google Drive / YouTube Demo Video Link (Unlisted - Anyone with link can view)](https://drive.google.com/drive/folders/your-submission-folder) *(Replace with your team's live recorded video link before submitting)*.
 
 ---
 
