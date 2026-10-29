@@ -3,11 +3,21 @@ Distributed Big Data ETL & Feature Engineering Pipeline using Apache PySpark
 Extracts, transforms, and loads Synthea relational EHR tables into an
 analytical Parquet Lakehouse partitioned by demographic subgroups.
 
+Implements leak-free feature engineering and clinically valid 30-day
+inpatient readmission target definition.
+
 Author: Ankith Umadi, Haneesh E, Vikas R (PES University BDSRAE Team)
 """
 
 import os
+import sys
 import time
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from src.big_data.spark_session import get_spark_session
@@ -17,9 +27,9 @@ def run_etl_pipeline(raw_dir="data/raw", processed_dir="data/processed", spark=N
     """
     Executes distributed PySpark ETL:
     1. Ingests Synthea relational CSVs (patients, encounters, conditions, medications, procedures)
-    2. Builds 30-day hospital readmission cohort from inpatient index admissions
-    3. Engineers comorbidity, polypharmacy, and utilization features
-    4. Writes partitioned Parquet lakehouse storage
+    2. Builds 30-day hospital readmission cohort from inpatient index admissions with censoring handling
+    3. Prevents temporal data leakage: features computed strictly on or before index discharge
+    4. Writes partitioned Parquet lakehouse storage partitioned by [age_group, race]
     """
     start_time = time.time()
     own_spark = False
@@ -36,25 +46,33 @@ def run_etl_pipeline(raw_dir="data/raw", processed_dir="data/processed", spark=N
     df_medications = spark.read.option("header", "true").csv(os.path.join(raw_dir, "medications.csv"))
     df_procedures = spark.read.option("header", "true").csv(os.path.join(raw_dir, "procedures.csv"))
 
-    print(f"    - Patients raw count:    {df_patients.count():,}")
-    print(f"    - Encounters raw count:  {df_encounters.count():,}")
+    raw_pat_count = df_patients.count()
+    raw_enc_count = df_encounters.count()
+    print(f"    - Patients raw count:    {raw_pat_count:,}")
+    print(f"    - Encounters raw count:  {raw_enc_count:,}")
 
-    # 2. Clean timestamps and patient demographics
+    # 2. Clean timestamps and patient demographics (preserving source categories)
     df_patients_clean = (
         df_patients
         .select(
             F.col("Id").alias("patient_id"),
             F.to_date(F.col("BIRTHDATE")).alias("birth_date"),
-            F.lower(F.col("GENDER")).alias("gender"),
-            F.lower(F.col("RACE")).alias("race"),
-            F.lower(F.col("ETHNICITY")).alias("ethnicity"),
+            F.col("GENDER").alias("raw_gender"),
+            F.col("RACE").alias("raw_race"),
+            F.col("ETHNICITY").alias("raw_ethnicity"),
             F.col("CITY").alias("city"),
             F.col("ZIP").alias("zip_code"),
             F.col("HEALTHCARE_EXPENSES").cast("double").alias("healthcare_expenses"),
             F.col("HEALTHCARE_COVERAGE").cast("double").alias("healthcare_coverage")
         )
-        .withColumn("gender", F.when(F.col("gender") == "f", "Female").otherwise("Male"))
-        .withColumn("race", F.initcap(F.col("race")))
+        .withColumn(
+            "gender",
+            F.when(F.upper(F.col("raw_gender")) == "F", "Female")
+            .when(F.upper(F.col("raw_gender")) == "M", "Male")
+            .otherwise(F.coalesce(F.col("raw_gender"), F.lit("Unknown")))
+        )
+        .withColumn("race", F.initcap(F.coalesce(F.col("raw_race"), F.lit("Unknown"))))
+        .withColumn("ethnicity", F.initcap(F.coalesce(F.col("raw_ethnicity"), F.lit("Unknown"))))
     )
 
     # 3. Clean encounters
@@ -73,6 +91,10 @@ def run_etl_pipeline(raw_dir="data/raw", processed_dir="data/processed", spark=N
         )
     )
 
+    # Compute maximum observation date in encounters to detect boundary censoring
+    max_study_date = df_enc_clean.select(F.max("enc_stop")).collect()[0][0]
+    print(f"    - Dataset observation horizon cutoff: {max_study_date}")
+
     # 4. Join encounters with patient birthdate to calculate age at admission
     df_enc_with_pat = (
         df_enc_clean
@@ -89,49 +111,106 @@ def run_etl_pipeline(raw_dir="data/raw", processed_dir="data/processed", spark=N
         )
     )
 
-    # 5. Distributed Window Analytics for Prior Utilization & 30-Day Readmission Target
-    patient_window = Window.partitionBy("patient_id").orderBy("enc_start")
-
-    # Lead to identify next hospital encounter
-    df_enc_windowed = (
+    # 5. Cohort Selection: Inpatient Index Admissions
+    df_index_admissions = (
         df_enc_with_pat
-        .withColumn("next_enc_start", F.lead("enc_start", 1).over(patient_window))
-        .withColumn("next_enc_class", F.lead("encounter_class", 1).over(patient_window))
-        .withColumn("days_to_next_enc", 
-            (F.col("next_enc_start").cast("long") - F.col("enc_stop").cast("long")) / 86400.0
+        .filter(F.col("encounter_class") == "inpatient")
+        .select(
+            "encounter_id", "patient_id", "enc_start", "enc_stop",
+            "age", "age_group", "gender", "race", "ethnicity",
+            "length_of_stay", "total_claim_cost"
         )
     )
+    total_inpatient_admissions = df_index_admissions.count()
 
-    # Filter to index admissions (inpatient stays)
-    df_index_admissions = df_enc_windowed.filter(F.col("encounter_class") == "inpatient")
+    # 6. Target Construction: Next Qualifying Inpatient Admission within 30 Days
+    # Self-join inpatient stays on patient_id where nxt.enc_start > cur.enc_stop
+    # This prevents:
+    # (a) Intervening ambulatory visits from masking readmissions
+    # (b) Overlapping/concurrent episodes (nxt.enc_start <= cur.enc_stop) from being labeled as readmissions
+    # (c) Emergency visits from being conflated with inpatient readmissions
+    df_next_inpatient = (
+        df_index_admissions.alias("cur")
+        .join(
+            df_index_admissions.alias("nxt"),
+            on=(F.col("cur.patient_id") == F.col("nxt.patient_id")) & 
+               (F.col("nxt.enc_start") > F.col("cur.enc_stop")),
+            how="left"
+        )
+        .groupBy("cur.encounter_id")
+        .agg(F.min("nxt.enc_start").alias("next_inpatient_start"))
+    )
 
-    # Target: 30-day readmission = next encounter is inpatient/emergency and occurred within 30 days of discharge
-    df_cohort_labeled = (
+    # Join next inpatient admission date and compute gap
+    df_cohort_with_gap = (
         df_index_admissions
+        .join(df_next_inpatient, on="encounter_id", how="left")
+        .withColumn(
+            "days_to_next_inpatient",
+            (F.col("next_inpatient_start").cast("long") - F.col("enc_stop").cast("long")) / 86400.0
+        )
+        .withColumn(
+            "has_sufficient_followup",
+            (F.col("next_inpatient_start").isNotNull()) |
+            (F.col("enc_stop") <= (F.lit(max_study_date) - F.expr("INTERVAL 30 DAYS")))
+        )
         .withColumn(
             "readmission_30d",
             F.when(
-                (F.col("days_to_next_enc") >= 0.0) & 
-                (F.col("days_to_next_enc") <= 30.0) & 
-                (F.col("next_enc_class").isin("inpatient", "emergency")),
+                (F.col("days_to_next_inpatient") > 0.0) &
+                (F.col("days_to_next_inpatient") <= 30.0),
                 1
             ).otherwise(0)
         )
     )
 
-    # 6. Distributed Feature Extraction: Conditions, Medications, Procedures
-    # Chronic comorbidity indicators
+    # Censor Handling: Exclude index admissions that occur < 30 days before dataset horizon without readmission
+    censored_count = df_cohort_with_gap.filter(~F.col("has_sufficient_followup")).count()
+    if censored_count > 0:
+        print(f"    - Censor Handling: Excluded {censored_count} index admissions occurring <30 days before dataset cutoff without readmission.")
+    df_cohort_labeled = df_cohort_with_gap.filter(F.col("has_sufficient_followup"))
+
+    # 7. Leak-Free Feature Engineering (Strictly Prior to / At Discharge Cutoff)
+    # (A) Prior Utilization: count encounters with enc_start < index enc_start
+    df_prior_util = (
+        df_cohort_labeled.select("encounter_id", "patient_id", "enc_start")
+        .join(
+            df_enc_clean.select(
+                F.col("patient_id"),
+                F.col("enc_start").alias("hist_enc_start"),
+                F.col("encounter_class").alias("hist_enc_class")
+            ),
+            on="patient_id",
+            how="inner"
+        )
+        .filter(F.col("hist_enc_start") < F.col("enc_start"))
+        .groupBy("encounter_id")
+        .agg(
+            F.sum(F.when(F.col("hist_enc_class") == "inpatient", 1).otherwise(0)).alias("num_prior_inpatient"),
+            F.sum(F.when(F.col("hist_enc_class") == "emergency", 1).otherwise(0)).alias("num_prior_emergency"),
+            F.sum(F.when(F.col("hist_enc_class") == "ambulatory", 1).otherwise(0)).alias("num_prior_ambulatory")
+        )
+    )
+
+    # (B) Chronic Comorbidities: conditions diagnosed on or before index discharge
     df_conditions_clean = (
         df_conditions
         .select(
             F.col("PATIENT").alias("patient_id"),
+            F.to_date(F.col("START")).alias("cond_start"),
+            F.to_date(F.col("STOP")).alias("cond_stop"),
             F.lower(F.col("DESCRIPTION")).alias("condition_desc")
         )
     )
 
     df_comorbidities = (
-        df_conditions_clean
-        .groupBy("patient_id")
+        df_cohort_labeled.select("encounter_id", "patient_id", "enc_stop")
+        .join(df_conditions_clean, on="patient_id", how="inner")
+        .filter(
+            (F.col("cond_start") <= F.to_date(F.col("enc_stop"))) &
+            (F.col("cond_stop").isNull() | (F.col("cond_stop") >= F.to_date(F.col("enc_stop"))))
+        )
+        .groupBy("encounter_id")
         .agg(
             F.max(F.when(F.col("condition_desc").contains("hypertension"), 1).otherwise(0)).alias("has_hypertension"),
             F.max(F.when(F.col("condition_desc").contains("diabetes"), 1).otherwise(0)).alias("has_diabetes"),
@@ -139,48 +218,57 @@ def run_etl_pipeline(raw_dir="data/raw", processed_dir="data/processed", spark=N
             F.max(F.when(F.col("condition_desc").contains("obstructive pulmonary"), 1).otherwise(0)).alias("has_copd"),
             F.max(F.when(F.col("condition_desc").contains("kidney"), 1).otherwise(0)).alias("has_ckd"),
             F.max(F.when(F.col("condition_desc").contains("coronary"), 1).otherwise(0)).alias("has_cad"),
-            F.max(F.when(F.col("condition_desc").contains("depression"), 1).otherwise(0)).alias("has_depression"),
+            F.max(F.when(F.col("condition_desc").contains("depress"), 1).otherwise(0)).alias("has_depression"),
             F.countDistinct("condition_desc").alias("comorbidity_count")
         )
     )
 
-    # Polypharmacy medication counts
-    df_med_counts = (
+    # (C) Polypharmacy / Active Medications on or before discharge
+    df_medications_clean = (
         df_medications
-        .groupBy(F.col("PATIENT").alias("patient_id"))
-        .agg(F.countDistinct("CODE").alias("total_medications"))
-    )
-
-    # Procedures count
-    df_proc_counts = (
-        df_procedures
-        .groupBy(F.col("PATIENT").alias("patient_id"))
-        .agg(F.countDistinct("CODE").alias("total_procedures"))
-    )
-
-    # Prior utilization summary per patient
-    df_prior_util = (
-        df_enc_clean
-        .groupBy("patient_id")
-        .agg(
-            F.sum(F.when(F.col("encounter_class") == "inpatient", 1).otherwise(0)).alias("num_prior_inpatient"),
-            F.sum(F.when(F.col("encounter_class") == "emergency", 1).otherwise(0)).alias("num_prior_emergency"),
-            F.sum(F.when(F.col("encounter_class") == "ambulatory", 1).otherwise(0)).alias("num_prior_ambulatory")
+        .select(
+            F.col("PATIENT").alias("patient_id"),
+            F.to_date(F.col("START")).alias("med_start"),
+            F.col("CODE").alias("med_code")
         )
     )
+    df_med_counts = (
+        df_cohort_labeled.select("encounter_id", "patient_id", "enc_stop")
+        .join(df_medications_clean, on="patient_id", how="inner")
+        .filter(F.col("med_start") <= F.to_date(F.col("enc_stop")))
+        .groupBy("encounter_id")
+        .agg(F.countDistinct("med_code").alias("total_medications"))
+    )
 
-    # 7. Final Join to assemble the Analytical Feature Store
+    # (D) Procedures performed on or before discharge
+    df_procedures_clean = (
+        df_procedures
+        .select(
+            F.col("PATIENT").alias("patient_id"),
+            F.to_date(F.col("DATE")).alias("proc_date"),
+            F.col("CODE").alias("proc_code")
+        )
+    )
+    df_proc_counts = (
+        df_cohort_labeled.select("encounter_id", "patient_id", "enc_stop")
+        .join(df_procedures_clean, on="patient_id", how="inner")
+        .filter(F.col("proc_date") <= F.to_date(F.col("enc_stop")))
+        .groupBy("encounter_id")
+        .agg(F.countDistinct("proc_code").alias("total_procedures"))
+    )
+
+    # 8. Assemble Final Analytical Lakehouse Cohort
     df_final_cohort = (
         df_cohort_labeled
-        .join(df_comorbidities, on="patient_id", how="left")
-        .join(df_med_counts, on="patient_id", how="left")
-        .join(df_proc_counts, on="patient_id", how="left")
-        .join(df_prior_util, on="patient_id", how="left")
+        .join(df_prior_util, on="encounter_id", how="left")
+        .join(df_comorbidities, on="encounter_id", how="left")
+        .join(df_med_counts, on="encounter_id", how="left")
+        .join(df_proc_counts, on="encounter_id", how="left")
         .na.fill({
             "has_hypertension": 0, "has_diabetes": 0, "has_heart_failure": 0,
             "has_copd": 0, "has_ckd": 0, "has_cad": 0, "has_depression": 0,
             "comorbidity_count": 0, "total_medications": 0, "total_procedures": 0,
-            "num_prior_inpatient": 1, "num_prior_emergency": 0, "num_prior_ambulatory": 0
+            "num_prior_inpatient": 0, "num_prior_emergency": 0, "num_prior_ambulatory": 0
         })
         .select(
             "encounter_id", "patient_id",
@@ -198,11 +286,10 @@ def run_etl_pipeline(raw_dir="data/raw", processed_dir="data/processed", spark=N
     readm_rate = (readm_count / cohort_count) * 100.0 if cohort_count > 0 else 0.0
 
     print(f"[+] Final Inpatient Readmission Cohort assembled:")
-    print(f"    - Index Admissions:     {cohort_count:,}")
+    print(f"    - Index Admissions:     {cohort_count:,} (of {total_inpatient_admissions:,} total inpatient stays)")
     print(f"    - 30-Day Readmissions:  {readm_count:,} ({readm_rate:.2f}%)")
 
-    # 8. Partitioned Parquet Lakehouse Storage Design
-    # Partition by age_group and race to optimize demographic query pruning & subgroup isolation
+    # 9. Partitioned Parquet Lakehouse Storage Design
     print(f"[*] Writing analytical Parquet lakehouse partitioned by [age_group, race] to: {processed_dir}")
     os.makedirs(processed_dir, exist_ok=True)
     

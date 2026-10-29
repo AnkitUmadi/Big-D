@@ -1,8 +1,8 @@
-# Subgroup Performance, Calibration Disparities, and Scalable Fairness Mitigation in Healthcare Risk Models
+# Subgroup Performance in Healthcare Risk Models: Big Data Systems & Responsible AI Engineering
 
 [![Course](https://img.shields.io/badge/PES_University-BDSRAE_2026-blue.svg)](https://www.pes.edu)
-[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
-[![Apache PySpark](https://img.shields.io/badge/Apache_PySpark-3.5.1-orange.svg)](https://spark.apache.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![Apache PySpark](https://img.shields.io/badge/Apache_PySpark-4.2.1-orange.svg)](https://spark.apache.org/)
 [![Fairlearn](https://img.shields.io/badge/Fairlearn-0.15.0-brightgreen.svg)](https://fairlearn.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -17,15 +17,15 @@
 
 ---
 
-## 📌 Executive Summary
+## 📌 Project Overview
 
-Predictive machine learning models in hospital electronic health record (EHR) systems frequently suffer from the **"Accuracy Paradox" of Clinical AI**: models that achieve state-of-the-art global discrimination ($\text{Global ROC-AUC} \ge 0.90$) often exhibit severe, systematic failure modes across vulnerable demographic subgroups. In hospital readmission triage, these failures lead to **unmonitored discharges of high-risk minority patients** (false negatives) and **distorted clinical care tiers** caused by probability miscalibration.
+Predictive machine learning models deployed in hospital electronic health record (EHR) systems frequently suffer from clinical failure modes: models achieving high overall accuracy (e.g., >80%) frequently exhibit severe sensitivity collapse and probability miscalibration across demographic subgroups. In 30-day hospital readmission triage, these disparities result in unmonitored discharges of high-risk minority patients (false negatives) and wasted transitional care resources (false alarms).
 
-This repository provides a production-grade, reproducible end-to-end Big Data and Responsible AI pipeline that:
-1. **Big Data Systems Design:** Implements an **Apache PySpark 3.5.1** distributed ETL and feature engine that processes longitudinal EHR tables, derives 30-day index readmissions, aggregates chronic comorbidity indices, and stores the analytical cohort in a **Partitioned Parquet Lakehouse** (`[age_group, race]`), achieving a **$30.5\times$ storage footprint reduction** and scaling to **$5,631$ records/sec**.
-2. **Responsible AI Auditing:** Conducts comprehensive performance and calibration audits across Age, Sex, Race, and Intersectional cohorts, uncovering severe sensitivity collapse ($21.4\%$ in pediatrics, $0.0\%$ in Native Americans) and dramatic calibration disparities ($\text{ECE} = 0.1107$ in Asians vs. $0.0287$ in Whites).
-3. **Algorithmic Bias Mitigation:** Evaluates Pre-processing Reweighing, Subgroup-Specific Isotonic Calibration, and Fairlearn Threshold Optimization under Equalized Odds constraints, **slashing Equal Opportunity Disparity by $55.6\%$** (from $0.7500$ to $0.3333$) while preserving an identical $0.9010$ ROC-AUC.
-4. **Clinical Governance:** Establishes an industry-standard **Model Card** (Mitchell et al.) and **Data Card** (Gebru et al.) documenting intended use, out-of-scope boundaries, and residual clinical safety warnings.
+This project implements a complete, leak-free Big Data and Responsible AI system:
+1. **Big Data Systems:** Distributed Apache PySpark ETL pipeline that ingests relational Synthea-style EHR tables, eliminates temporal leakage, handles overlapping encounters and boundary censoring, constructs a defensible 30-day inpatient readmission target, and stores analytical cohorts in a partitioned Parquet Lakehouse (`[age_group, race]`).
+2. **Responsible AI Auditing:** Granular subgroup performance and calibration evaluation across Age, Gender, Race, Ethnicity, and Intersectional strata, identifying small-sample vulnerabilities and clinical failure modes.
+3. **Algorithmic Bias Mitigation:** Comparative evaluation of Pre-processing Reweighing, Subgroup-Specific Isotonic Calibration, and Fairlearn Threshold Optimization under Equal Opportunity constraints.
+4. **Clinical Governance:** Formal Model Card (Mitchell et al.) and Data Card (Gebru et al.) documenting intended use, prohibited use, data provenance, and clinical safety warnings.
 
 ---
 
@@ -33,194 +33,205 @@ This repository provides a production-grade, reproducible end-to-end Big Data an
 
 ```mermaid
 flowchart TD
-    subgraph S1["1. Raw Synthea EHR Relational Ingestion"]
-        P["patients.csv<br/>Demographics & SES"]
-        E["encounters.csv<br/>Inpatient, Emergency, Ambulatory"]
-        C["conditions.csv<br/>SNOMED-CT Diagnoses"]
-        M["medications.csv<br/>RxNorm Prescriptions"]
-        PR["procedures.csv<br/>Diagnostic Interventions"]
+    subgraph S1["1. Raw EHR Ingestion & Quality Audit"]
+        P["patients.csv (15k Patients)"]
+        E["encounters.csv (87.3k Encounters)"]
+        C["conditions.csv (33.7k Diagnoses)"]
+        M["medications.csv (29.9k Prescriptions)"]
+        PR["procedures.csv (2.1k Procedures)"]
     end
 
-    subgraph S2["2. Apache PySpark 3.5.1 Distributed ETL"]
-        W["Longitudinal Windowing<br/>PartitionBy(patient_id).OrderBy(start)"]
-        IDX["Index Inpatient Filter<br/>30-Day Readmission Target Labeling"]
-        FEAT["Distributed Feature Aggregation<br/>Comorbidities, Polypharmacy, Prior Visits"]
+    subgraph S2["2. Distributed PySpark ETL & Lakehouse"]
+        TARGET["Leak-Free Target Derivation<br/>Next Inpatient Stay within 30 Days<br/>Overlap Filter & Boundary Censoring"]
+        FEAT["Temporal Feature Aggregation<br/>Prior Encounters, Active Comorbidities,<br/>Medications & Procedures at Discharge"]
+        LAKE["Partitioned Parquet Lakehouse<br/>partitionBy(age_group, race)<br/>53.7x Storage Compression"]
     end
 
-    subgraph S3["3. Partitioned Parquet Lakehouse Storage"]
-        LAKE["Partitioned Parquet Lakehouse<br/>partitionBy(age_group, race)<br/>30.5x Storage Compression & Predicate Pushdown"]
+    subgraph S3["3. Patient-Split Modeling & Baseline Audit"]
+        SPLIT["Patient-Level Stratified Split<br/>Train (70%) | Val (15%) | Test (15%)<br/>Zero Patient Leakage"]
+        MODELS["Baseline Clinical Classifiers<br/>LightGBM | Logistic Regression | Random Forest"]
+        AUDIT["Subgroup Fairness & Calibration Audit<br/>Age, Gender, Race, Ethnicity, Intersectional<br/>TPR, FPR, ECE, MCE, Reliability Curves"]
     end
 
-    subgraph S4["4. Baseline Risk Models & Responsible AI Audit"]
-        LGB["LightGBM Classifier<br/>Global ROC-AUC: 0.9010"]
-        AUD["Granular Subgroup Audit Engine<br/>Sensitivity, Specificity, FPR, ECE, MCE"]
-        INT["Intersectional Analysis<br/>Age x Race x Gender Compounded Harms"]
+    subgraph S4["4. Responsible AI Mitigation & Governance"]
+        MIT1["Pre-processing: Sample Reweighing (Train-Only)"]
+        MIT2["Post-processing: Subgroup Calibration (Val-Fit)"]
+        MIT3["Post-processing: Fairlearn ThresholdOpt (Val-Fit)"]
+        CARDS["Governance Deliverables<br/>DATA_CARD.md | MODEL_CARD.md | Technical Report"]
     end
 
-    subgraph S5["5. Algorithmic Bias Mitigation & Triage Governance"]
-        MIT1["Pre-Processing: Fair Reweighing"]
-        MIT2["Post-Processing: Subgroup Isotonic Calibration"]
-        MIT3["Post-Processing: Fairlearn ThresholdOptimizer"]
-        MC["Mitchell et al. Model Card<br/>Intended Use & Residual Risk Disclosures"]
-    end
-
-    P --> W
-    E --> W
+    P --> TARGET
+    E --> TARGET
     C --> FEAT
     M --> FEAT
     PR --> FEAT
-    W --> IDX
-    IDX --> FEAT
+    TARGET --> FEAT
     FEAT --> LAKE
-    LAKE --> LGB
-    LGB --> AUD
-    LGB --> INT
-    AUD --> MIT1
-    AUD --> MIT2
-    AUD --> MIT3
-    MIT3 --> MC
+    LAKE --> SPLIT
+    SPLIT --> MODELS
+    MODELS --> AUDIT
+    AUDIT --> MIT1
+    AUDIT --> MIT2
+    AUDIT --> MIT3
+    MIT2 --> CARDS
+    MIT3 --> CARDS
 ```
 
 ---
 
-## 📊 Empirical Results & Measured Evidence
+## 📊 Measured Empirical Results
 
-### 1. Measured Big Data Scalability Evidence (Requirement 1)
-Evaluated across expanding patient cohorts ($5,000$, $10,000$, and $20,000$ synthetic patients):
+### 1. Big Data Systems Scalability Benchmarks
+Benchmarked using PySpark 4.2.1 running on local multi-threading (`master='local[*]'`) on Windows 11 (16 CPU cores, 23.7 GB RAM):
 
-| Cohort Scale (Patients) | Encounters Processed | Raw CSV Footprint | Parquet Lakehouse | Compression Ratio | Spark ETL Runtime | Record Throughput |
+| Cohort Scale (Patients) | Encounters Processed | Raw CSV Size | Parquet Lakehouse | Compression Ratio | Spark ETL Runtime | Record Throughput |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **5,000** | 28,709 | 10.9 MB | 0.4 MB | **$29.4\times$** | 3.27 s | 1,528.5 rec/s |
-| **10,000** | 58,469 | 22.2 MB | 0.7 MB | **$31.1\times$** | 3.12 s | 3,202.6 rec/s |
-| **20,000** | 115,246 | 43.9 MB | 1.4 MB | **$30.5\times$** | 3.55 s | **5,631.3 rec/s** |
+| **2,500** | 14,530 | 5.52 MB | 0.19 MB | **29.7x** | 8.98 s | 278.3 patients/s |
+| **5,000** | 28,712 | 10.92 MB | 0.23 MB | **47.2x** | 8.63 s | 579.5 patients/s |
+| **10,000** | 58,343 | 22.16 MB | 0.34 MB | **66.0x** | 11.17 s | **895.4 patients/s** |
+
+### 2. Baseline Model Performance on Frozen Held-Out Test Set (N = 550 Encounters across 343 Patients)
+Split strictly by patient identifier (zero patient overlap across Train, Val, Test):
+
+| Model | ROC-AUC | PR-AUC | Brier Score | Accuracy | F1-Score | Sensitivity (TPR) | Precision (PPV) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **LightGBM** | 0.6710 | 0.3057 | 0.1437 | 80.73% | 0.0536 | 2.91% | 33.33% |
+| **Logistic Regression** | 0.6824 | 0.2866 | 0.1430 | 81.09% | 0.0000 | 0.00% | 0.00% |
+| **Random Forest** | 0.6835 | 0.3078 | 0.1421 | 80.73% | 0.0000 | 0.00% | 0.00% |
+
+### 3. Subgroup Performance Disparities (Baseline LightGBM on Test Set)
+
+| Demographic Subgroup | Sample Count (N) | Base Readmission Rate | Subgroup ROC-AUC | Sensitivity (TPR) | Miss Rate (FNR) | False Alarm Rate (FPR) | Expected Calibration Error (ECE) | Small Sample Flag |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **White** | 317 | 17.67% | 0.6556 | 3.57% | 96.43% | 1.15% | 0.0375 | Robust ($N \ge 30$) |
+| **Black** | 110 | 23.64% | 0.7422 | **0.00%** | **100.0%** | 2.38% | 0.0798 | Robust ($N \ge 30$) |
+| **Hispanic** | 78 | 20.51% | 0.6643 | **0.00%** | **100.0%** | 1.61% | 0.0673 | Robust ($N \ge 30$) |
+| **Asian** | 25 | 16.00% | 0.5000 | **0.00%** | **100.0%** | 0.00% | 0.0772 | Warning ($N<30$) |
+| **Other** | 13 | 7.69% | 1.0000 | 100.0% | 0.00% | 0.00% | 0.2324 | High Variance ($N_{\text{pos}}=1$) |
+| **Native American** | 7 | 0.00% | N/A | N/A | N/A | 0.00% | 0.2299 | High Risk ($N_{\text{pos}}=0$) |
+| **Geriatric (65+)** | 208 | 25.96% | 0.6871 | 3.70% | 96.30% | 1.95% | 0.0692 | Robust ($N \ge 30$) |
+| **Middle Age (45-64)** | 176 | 14.77% | 0.5977 | 3.85% | 96.15% | 0.67% | 0.0526 | Robust ($N \ge 30$) |
+| **Young Adult (18-44)**| 118 | 13.56% | 0.7010 | 0.00% | 100.0% | 1.96% | 0.0232 | Robust ($N \ge 30$) |
+| **Pediatric (<18)** | 48 | 14.58% | **0.4530** | 0.00% | 100.0% | 0.00% | **0.1621** | Robust ($N \ge 30$) |
+
+### 4. Algorithmic Bias Mitigation & Trade-Off Comparison
+
+| Model Configuration | Mitigation Strategy | ROC-AUC | Accuracy | F1-Score | All-Groups $\Delta_{\text{EO}}$ | Robust ($N \ge 30$) $\Delta_{\text{EO}}$ | Mean Subgroup ECE |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline LightGBM** | Default unmitigated (0.5 cutoff) | **0.6710** | 80.73% | 0.0536 | 1.0000 | 0.0357 | 0.1207 |
+| **Demographic Reweighed** | Pre-processing sample weights (Train) | 0.6605 | **81.09%** | 0.0545 | 1.0000 | 0.0357 | 0.1339 |
+| **Subgroup Isotonic Calibrated**| Post-processing calibration (Val) | 0.6627 | 80.55% | 0.0360 | **0.1250** | 0.1250 | **0.1004** |
+| **ThresholdOptimized_EO** | Fairlearn post-processing (Val) | N/A | 40.91% | **0.3762** | 0.2500 | **0.0714** | N/A |
 
 ---
 
-### 2. Baseline Subgroup Performance & Failure Audit (Requirement 1 & 2)
+## 🛠️ Reproduction Guide
 
-| Attribute | Subgroup | Test $N$ | Base Rate | ROC-AUC | Sensitivity ($\text{TPR}$) | Miss Rate ($\text{FNR}$) | $\text{FPR}$ | Calibration $\text{ECE}$ |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Age Group** | Geriatric (65+) | 318 | 25.47% | 0.8895 | 0.6296 | 37.04% | 0.1266 | 0.0456 |
-| **Age Group** | Middle Age (45–64) | 298 | 20.81% | 0.8871 | 0.4516 | **54.84%** | 0.0975 | 0.0451 |
-| **Age Group** | Pediatric (<18) | 73 | 19.18% | 0.8947 | 0.2143 | **78.57%** | 0.0339 | 0.0488 |
-| **Age Group** | Young Adult (18–44) | 219 | 17.81% | 0.9380 | 0.5641 | 43.59% | 0.0500 | 0.0292 |
-| **Race** | Asian | 47 | 8.51% | 0.9128 | 0.7500 | 25.00% | 0.0930 | **0.1107** |
-| **Race** | Black | 165 | 23.64% | 0.8934 | 0.5897 | 41.03% | 0.1349 | 0.0694 |
-| **Race** | Hispanic | 134 | 25.37% | 0.9132 | 0.5588 | 44.12% | 0.0600 | 0.0722 |
-| **Race** | Native American | 15 | 20.00% | 0.8611 | **0.0000** | **100.00%** | 0.0833 | **0.2319** |
-| **Race** | White | 535 | 21.31% | 0.8997 | 0.5088 | 49.12% | 0.0855 | **0.0287** |
+### Prerequisites
+- Python 3.10 – 3.12
+- Java Runtime Environment (OpenJDK 17 or 21) for PySpark
+- Dependencies listed in `requirements.txt`
 
----
-
-### 3. Mitigation & Fairness-Utility Pareto Frontier
-
-| Model Variant | Global ROC-AUC | Overall Accuracy | Equal Opportunity Disparity ($\Delta_{\text{EO}}$) | Demographic Parity Disparity ($\Delta_{\text{DP}}$) | Mean Subgroup ECE |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Baseline (LightGBM)** | **0.9010** | **82.82%** | 0.7500 | 0.1758 | 0.1026 |
-| **Pre-Processing Reweighted** | 0.8990 | 82.05% | 1.0000 | 0.1636 | **0.0972** |
-| **Subgroup-Calibrated** | **0.9012** | 82.27% | 0.4167 | 0.1894 | 0.1233 |
-| **Threshold-Optimized (Fairlearn)**| **0.9010** | 80.07% | **0.3333** (**-55.6%**) | **0.1561** | 0.1026 |
-
----
-
-## 📂 Repository Deliverables Matrix (Option A)
-
-| Deliverable Required | Repository Location | Description |
-| :--- | :--- | :--- |
-| **1. README with Architecture & Setup** | [`README.md`](README.md) | Architectural diagrams, quantitative highlights, step-by-step setup guide. |
-| **2. Reproducible Pipeline** | [`run_pipeline.py`](run_pipeline.py), [`Dockerfile`](Dockerfile), [`docker-compose.yml`](docker-compose.yml) | Master CLI pipeline and container definitions for zero-friction reproduction. |
-| **3. Results Notebook** | [`notebooks/subgroup_risk_analysis.ipynb`](notebooks/subgroup_risk_analysis.ipynb) | Pre-executed interactive notebook with charts, markdown narrative, and outputs. |
-| **4. Technical Report (3–5 Pages)** | [📄 `reports/technical_report.pdf`](reports/technical_report.pdf), [`reports/technical_report.md`](reports/technical_report.md) | Formal academic conference-grade research paper (available in PDF & Markdown). |
-| **5. Model Card & Data Card** | [`MODEL_CARD.md`](MODEL_CARD.md), [`DATA_CARD.md`](DATA_CARD.md) | Mitchell et al. Model Card with Intended Use & Gebru et al. Data Card. |
-| **6. 3-Minute Demo Video Script & Link** | [`presentation/demo_video_script.md`](presentation/demo_video_script.md) | Turn-by-turn storyboard, timing, voiceover, and visual cues. |
-| **7. Capstone Presentation Deck Guide** | [`presentation/presentation_deck_outline.md`](presentation/presentation_deck_outline.md) | 8–10 minute slide-by-slide defense guide using the PESU Capstone template. |
-| **8. Clinical Subgroup Report** | [`reports/subgroup_disparity_report.md`](reports/subgroup_disparity_report.md) | Topic-specific deep-dive clinical failure and mitigation report. |
-
----
-
-## 🎥 3-Minute Demo Video
-
-- **Video Walkthrough Script:** Full scene-by-scene script available at [`presentation/demo_video_script.md`](presentation/demo_video_script.md).
-- **Video Link:** [Google Drive / YouTube Demo Video Link (Unlisted - Anyone with link can view)](https://drive.google.com/drive/folders/your-submission-folder) *(Replace with your team's live recorded video link before submitting)*.
-
----
-
-## 🚀 Quickstart & Setup Steps
-
-### Option A: Local Python Environment
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/<your-username>/subgroup-healthcare-readmission.git
-   cd subgroup-healthcare-readmission
-   ```
-
-2. **Create and activate a virtual environment:**
-   ```bash
-   # Windows PowerShell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-
-   # Linux / macOS
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Execute the End-to-End Pipeline:**
-   ```bash
-   python run_pipeline.py --cohort_size 15000
-   ```
-   *Generates synthetic EHR data, runs PySpark ETL, trains models, performs subgroup audits, applies mitigations, runs scalability benchmarks, and saves all evaluation figures in `reports/figures/`.*
-
-5. **Launch Interactive Results Notebook:**
-   ```bash
-   jupyter lab notebooks/subgroup_risk_analysis.ipynb
-   ```
-
----
-
-### Option B: Docker / Docker Compose
-
-To run the complete pipeline inside an isolated container with Java 17 and PySpark pre-configured:
-
+### Step 1: Environment Setup
 ```bash
-# Run the pipeline end-to-end
-docker-compose up pipeline
+# Create and activate virtual environment
+python -m venv venv
+.\venv\Scripts\activate   # Windows
+# source venv/bin/activate  # Linux / macOS
 
-# Or spin up the Jupyter Lab results server
-docker-compose up jupyter
+# Install dependencies
+pip install -r requirements.txt
 ```
-*Access Jupyter Lab at `http://localhost:8888` without needing any local Java or Python installations.*
+
+### Step 2: Run Automated Tests
+```bash
+python -m unittest tests/test_pipeline.py
+```
+*Expected Output:* `Ran 10 tests in ~0.5s. OK`
+
+### Step 3: Run the Master End-to-End Pipeline
+```bash
+python run_pipeline.py
+```
+To run the pipeline without the scalability benchmark suite:
+```bash
+python run_pipeline.py --skip_benchmarks
+```
+
+### Step 4: Inspect Generated Artifacts
+All figures and machine-readable metric tables are written to `reports/figures/`:
+- `subgroup_disparities.png` — Clinical sensitivity (TPR) and FPR disparities across subgroups
+- `calibration_comparison.png` — Reliability curves comparing baseline vs mitigated models
+- `fairness_utility_tradeoff.png` — Utility vs Equal Opportunity disparity Pareto plot
+- `intersectional_ece_heatmap.png` — Age x Race calibration error heatmap
+- `big_data_scaling.png` — Distributed PySpark throughput, latency, and compression scaling
+- `baseline_subgroup_performance.csv` — Granular metrics per demographic subgroup
+- `baseline_calibration_ece.csv` — Subgroup calibration error table
+- `intersectional_audit.csv` — Full intersectional breakdown
+- `mitigation_tradeoff_summary.csv` — Comparative model trade-offs
+- `scalability_benchmark.csv` — Scalability benchmarks with system specs
+
+### Step 5: Interactive Analysis Notebook
+Open and run `notebooks/subgroup_risk_analysis.ipynb` in Jupyter Lab or Notebook:
+```bash
+jupyter notebook notebooks/subgroup_risk_analysis.ipynb
+```
 
 ---
 
-## ⚖️ Ethical Governance & Clinical Disclaimers
+## 📁 Repository Directory Structure
 
-> [!IMPORTANT]
-> **Intended Use:** This system is engineered as an auxiliary decision-support tool for hospital discharge planning teams to identify adult patients who may benefit from transitional monitoring.
-> 
-> **Clinical Prohibitions:**
-> - Must **never** be used as an automated justification to deny inpatient admission, discharge patients early, or deny insurance claims.
-> - Automated scoring is **prohibited for pediatric patients (<18 years)** due to an empirical miss rate of $78.57\%$.
-> - All high-risk alerts must undergo human clinical review by an attending case manager.
+```
+Big-D/
+├── config/
+│   └── config.yaml                     # Pipeline parameters, cohort sizes, sensitive attributes
+├── data/
+│   ├── raw/                            # Raw Synthea-style EHR tables (patients, encounters, etc.)
+│   ├── processed/                      # Partitioned Parquet Lakehouse [age_group, race]
+│   └── synthea_generator.py            # Synthetic longitudinal EHR cohort generator
+├── hadoop/bin/                         # Windows Hadoop compatibility binaries (winutils.exe, hadoop.dll)
+├── models/
+│   └── saved/                          # Serialized model artifacts (.joblib)
+├── notebooks/
+│   ├── build_notebook.py               # Programmatic notebook builder and executor
+│   └── subgroup_risk_analysis.ipynb    # Fully executed analytical results notebook
+├── presentation/
+│   ├── demo_video_script.md            # 3-minute video demonstration script
+│   └── presentation_deck_outline.md    # 10-slide deck outline with speaker notes
+├── reports/
+│   ├── figures/                        # Generated figures and CSV metric tables
+│   ├── technical_report.md             # Comprehensive BDSRAE technical report
+│   ├── subgroup_disparity_report.md    # Detailed subgroup and intersectional audit report
+│   └── convert_report_to_pdf.py        # PDF report generator utility
+├── src/
+│   ├── big_data/
+│   │   ├── spark_session.py            # PySpark session configuration with RFC-1123 fix
+│   │   ├── etl_pipeline.py             # Leak-free distributed ETL & Parquet writer
+│   │   └── benchmark_scale.py          # Empirical throughput & compression benchmarking
+│   ├── evaluation/
+│   │   ├── subgroup_metrics.py         # Subgroup performance & fairness disparities
+│   │   ├── calibration_audit.py        # ECE, MCE, Brier score & reliability curves
+│   │   └── intersectional_audit.py     # Age x Race x Gender composite auditing
+│   ├── models/
+│   │   ├── train.py                    # Patient-independent splitting & baseline models
+│   │   └── mitigate.py                 # Reweighing, Subgroup Calibration, ThresholdOptimizer
+│   └── utils/
+│       └── plotting.py                 # Publication-quality plotting routines
+├── tests/
+│   └── test_pipeline.py                # 10 automated unit & integration tests
+├── DATA_CARD.md                        # Gebru et al. dataset documentation
+├── MODEL_CARD.md                       # Mitchell et al. clinical model card
+├── Dockerfile                          # Containerized execution environment
+├── docker-compose.yml                  # Docker Compose configuration
+├── requirements.txt                    # Python package dependencies
+├── run_pipeline.py                     # Master CLI orchestration script
+└── README.md                           # Project documentation
+```
 
 ---
 
-## 📜 License & Citation
+## ⚖️ Clinical Safety & Responsible AI Governance
 
-Distributed under the **MIT License**.
-
-```bibtex
-@misc{umadi2026subgroup,
-  title={Subgroup Performance, Calibration Disparities, and Scalable Fairness Mitigation in Healthcare Risk Models},
-  author={Umadi, Ankith and Haneesh, E. and Vikas, R.},
-  year={2026},
-  institution={PES University, Department of Computer Science & Engineering (AI & ML)},
-  note={Course Project: Big Data Systems & Responsible AI Engineering}
-}
-```
+1. **The Accuracy Paradox in Clinical AI:** Models reporting ~81% overall accuracy can exhibit near-zero clinical sensitivity for minority subgroups under standard decision thresholds (0.5 cutoff). Accuracy must never be used as the sole metric in clinical risk triage.
+2. **Probability Calibration as Clinical Fairness:** Clinical decision protocols rely on estimated probability thresholds. Subgroup-specific calibration reduces calibration error by 16.8% without introducing ethically contentious group-specific decision cutoffs.
+3. **Intended Decision-Support Role:** This tool is strictly decision support for post-discharge transitional care triage. It must never be used to deny clinical care, delay hospital discharge, or determine insurance reimbursement.

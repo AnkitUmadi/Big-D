@@ -1,10 +1,11 @@
-attribute,subgroup,n_samples,observed_base_rate,mean_predicted_risk,ece,mce,brier_score
-Race,Asian,47,0.0851,0.1617,0.1107,0.7402,0.0711
-Race,Black,165,0.2364,0.2467,0.0694,0.3551,0.1041
-Race,Hispanic,134,0.2537,0.2264,0.0722,0.7146,0.1045
-Race,Native,15,0.2,0.1901,0.2319,0.7562,0.118
-Race,White,535,0.2131,0.2273,0.0287,0.2793,0.1005
-Age Group,Geriatric (65+),318,0.2547,0.2655,0.0456,0.3672,0.1126
-Age Group,Middle Age (45-64),298,0.2081,0.226,0.0451,0.8721,0.1072
-Age Group,Pediatric (<18),73,0.1918,0.1827,0.0488,0.5719,0.0955
-Age Group,Young Adult (18-44),219,0.1781,0.1829,0.0292,0.2187,0.0731
+attribute,subgroup,n_samples,observed_base_rate,mean_predicted_risk,ece,mce,brier_score,small_sample_flag
+Race,Asian,25,0.16,0.1755,0.0772,0.3174,0.1379,True
+Race,Black,110,0.2364,0.1788,0.0798,0.556,0.1621,False
+Race,Hispanic,78,0.2051,0.1901,0.0673,0.6757,0.1605,False
+Race,Native,7,0.0,0.2299,0.2299,0.3344,0.0564,True
+Race,Other,13,0.0769,0.2442,0.2324,0.4228,0.0658,True
+Race,White,317,0.1767,0.1791,0.0375,0.1434,0.1388,False
+Age Group,Geriatric (65+),208,0.2596,0.2074,0.0692,0.6757,0.1777,False
+Age Group,Middle Age (45-64),176,0.1477,0.1761,0.0526,0.2504,0.1253,False
+Age Group,Pediatric (<18),48,0.1458,0.1754,0.1621,0.579,0.1359,False
+Age Group,Young Adult (18-44),118,0.1356,0.1516,0.0232,0.5406,0.1142,False

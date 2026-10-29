@@ -1,100 +1,123 @@
-# Model Card: Hospital 30-Day Readmission Risk Predictor with Subgroup Fairness Mitigation
+# Model Card: Hospital 30-Day Readmission Risk Predictor with Subgroup Fairness Auditing
 
 Following the Mitchell et al. (2019) *Model Cards for Model Reporting* standard.
 
 ---
 
 ## 1. Model Details
-- **Model Name:** ReadmissionRisk-FairBoost-v1.0
-- **Model Architecture:** Gradient Boosted Decision Trees (LightGBM) with Post-Processing Equalized Odds Threshold Optimization & Subgroup Isotonic Calibration.
+
+- **Model Name:** ClinicalReadmission-SubgroupAudit-v1.0
+- **Model Architectures:**
+  - Gradient Boosted Decision Trees (LightGBM) — primary non-linear clinical model
+  - Logistic Regression (L2 penalized) — standard interpretable clinical baseline
+  - Random Forest Classifier (100 estimators, max depth 8)
+- **Mitigation Suites Evaluated:**
+  1. *Pre-processing:* Demographic Sample Reweighing (fitted on training data)
+  2. *Post-processing Calibration:* Subgroup-Specific Isotonic Calibration (fitted on validation data)
+  3. *Post-processing Thresholds:* Fairlearn ThresholdOptimizer for Equal Opportunity (fitted on validation data)
 - **Model Date:** October 2026
 - **Model Version:** 1.0.0
-- **License:** MIT License
 - **Developers:** Ankith Umadi (PES1UG24AM422), Haneesh E (PES1UG24AM471), Vikas R (PES1UG24AM477)
 - **Institution:** Department of CSE (AI & ML), PES University, Bangalore, India
 - **Course:** Big Data Systems & Responsible AI Engineering (BDSRAE)
-- **Faculty Advisor:** Dr. Manjula Devananda
+- **Faculty Supervisor:** Dr. Manjula Devananda
 
 ---
 
-## 2. Intended Use Statement
+## 2. Intended Use & Clinical Deployment Boundaries
 
-### Primary Intended Uses:
-- **Clinical Decision Support for Discharge Planning:** Designed to assist multidisciplinary hospital discharge teams (inpatient case managers, transitional care nurses, clinical pharmacists) in identifying adult patients at elevated risk of all-cause 30-day hospital readmission prior to discharge.
-- **Transitional Resource Triage:** Facilitates targeted allocation of evidence-based transitional care interventions, including:
-  1. Post-discharge telephone follow-up within 48–72 hours.
-  2. In-home nurse visits and vitals monitoring.
-  3. Medication reconciliation and compliance counseling.
-  4. Rapid-turnaround primary care physician (PCP) follow-up appointment scheduling.
+### Primary Intended Use:
+- **Transitional Care Resource Allocation Support:** Designed to assist multidisciplinary hospital discharge teams (inpatient case managers, transitional care nurses, clinical pharmacists) in prioritizing patients for post-discharge supportive interventions prior to discharge:
+  - Post-discharge phone follow-up within 48–72 hours
+  - In-home nurse visits and vitals check
+  - Medication reconciliation and adherence counseling
+  - Rapid outpatient primary care follow-up scheduling
 
-### Out-of-Scope and Prohibited Uses:
-- **Automated Discharge Denial:** Strictly prohibited from being used to deny inpatient hospital discharge, delay necessary clinical transfers, or withhold palliative or hospice care.
-- **Insurance Underwriting or Denials:** Must never be used by commercial payers or Medicare Advantage organizations to deny claims, determine insurance premiums, or adjust reimbursement capitation.
-- **Pediatric Standalone Use:** The model is not validated for standalone decision-making in pediatric patients (<18 years) due to severe under-detection rates (miss rate 78.57%).
-- **Sole Arbiter of Care:** The model is a decision-*support* tool; clinical judgment by attending physicians and nurse navigators must always supersede algorithmic outputs.
-
----
-
-## 3. Factors and Subgroups
-- **Demographic Attributes Evaluated:**
-  - Age groups: Pediatric (<18), Young Adult (18–44), Middle Age (45–64), Geriatric (65+).
-  - Sex / Gender: Female, Male.
-  - Race & Ethnicity: White, Black/African American, Hispanic/Latino, Asian, Native American, Other.
-  - Intersectional strata: Composite $(\text{Age Group} \times \text{Race} \times \text{Gender})$.
-- **Clinical Features Utilized:**
-  - Length of Stay (days), prior 12-month inpatient admissions, prior emergency visits, ambulatory encounters.
-  - Chronic comorbidity indicators: Hypertension, Type 2 Diabetes, Congestive Heart Failure (CHF), COPD, Chronic Kidney Disease (CKD), Coronary Artery Disease (CAD), Depression.
-  - Polypharmacy (total active prescribed medication count), diagnostic procedure count, and total claim expense.
+### Out-of-Scope & Strictly Prohibited Uses:
+- **Automated Discharge Denial:** Strictly prohibited from being used to deny, delay, or mandate hospital discharge.
+- **Payer Underwriting or Claim Denials:** Must never be used by commercial payers, Medicare Advantage, or insurance adjusters to deny coverage, adjust capitation, or penalize providers.
+- **Autonomous Clinical Decisions:** The model is a clinical decision-*support* tool. Attending clinical judgment must always supersede model predictions.
+- **Pediatric Decision-Making:** Not validated for standalone pediatric use (<18 years); pediatric readmissions exhibit distinct pathophysiology and require dedicated pediatric scoring frameworks (e.g., Pediatric Risk of Readmission / PRR).
 
 ---
 
-## 4. Quantitative Metrics & Performance
+## 3. Factors, Features & Subgroups
 
-### 4.1 Overall Performance
-- **Global ROC-AUC:** 0.9010
-- **Precision-Recall AUC (PR-AUC):** 0.6679
-- **Overall Accuracy:** 80.07% (Post-Mitigation) / 82.82% (Baseline)
-- **Global Brier Score:** 0.0999
+### Demographic Attributes Audited:
+- **Age Groups:** Pediatric (<18), Young Adult (18–44), Middle Age (45–64), Geriatric (65+)
+- **Sex / Gender:** Female, Male
+- **Race:** White, Black, Hispanic, Asian, Native American, Other
+- **Ethnicity:** Non-Hispanic, Hispanic
+- **Intersectional Strata:** Composite $(\text{Age Group} \times \text{Race} \times \text{Gender})$
 
-### 4.2 Subgroup Disparities (Baseline vs. Mitigated)
-
-| Metric | Baseline LightGBM | Post-Processing Mitigated | Relative Improvement |
-| :--- | :---: | :---: | :---: |
-| **Equal Opportunity Disparity ($\Delta_{\text{EO}}$)** | 0.7500 | **0.3333** | **-55.6%** |
-| **Demographic Parity Disparity ($\Delta_{\text{DP}}$)** | 0.1758 | **0.1561** | **-11.2%** |
-| **Mean Subgroup Calibration Error ($\text{ECE}$)** | 0.1026 | **0.0972** (Calibrated) | **-5.3%** |
-| **Native American Miss Rate** | 100.0% | **33.3%** | **-66.7%** |
-| **Geriatric Sensitivity** | 62.96% | **68.52%** | **+5.56%** |
-
----
-
-## 5. Ethical Considerations & Disparity Root Causes
-1. **Historical Access Bias in Synthetic & Real EHR:**
-   Minority groups and underserved populations historically experience reduced access to outpatient primary care, leading to higher rates of acute emergency readmissions for ambulatory care-sensitive conditions (ACSCs). Unadjusted models penalize these patients or miscalculate their risk trajectory.
-2. **False Negative Risk in Healthcare:**
-   In clinical risk modeling, false negatives are vastly more harmful than false positives. A false negative deprives a high-risk patient of life-saving post-discharge monitoring, whereas a false positive merely results in an extra nurse telephone check-in or medication review.
-3. **Severe Representation Gaps:**
-   Synthetic EHR generators and real hospital registries suffer from small cohort sizes for Native American and Asian populations in specific hospital geographies. Training without subgroup-aware regularization causes empirical risk minimization (ERM) to ignore low-prevalence demographics.
+### Clinical Predictors (16 Leak-Free Features Available at Discharge Cutoff):
+- Patient age at admission
+- Length of hospital stay (days)
+- Prior 12-month inpatient admissions, emergency visits, and ambulatory visits (strictly prior to index encounter start)
+- Chronic comorbidity indicators (diagnosed on or before index discharge): Hypertension, Type 2 Diabetes, Congestive Heart Failure, COPD, Chronic Kidney Disease, Coronary Artery Disease, Depression
+- Cumulative comorbidity count
+- Polypharmacy (distinct active prescribed medications at discharge)
+- Cumulative diagnostic and surgical procedures performed at/before discharge
+- Total claim expense of index encounter
 
 ---
 
-## 6. Documented Residual Risks & Clinical Safety Warnings
+## 4. Quantitative Evaluation & Experimental Results
+
+### 4.1 Overall Performance on Frozen Held-Out Test Set (N = 550 Encounters across 343 Patients)
+Evaluated on patient-independent held-out test data (zero patient overlap with train/val):
+
+| Model | ROC-AUC | PR-AUC | Brier Score | Accuracy | F1-Score | Sensitivity (TPR) | Precision (PPV) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **LightGBM** | 0.6710 | 0.3057 | 0.1437 | 80.73% | 0.0536 | 2.91% | 33.33% |
+| **Logistic Regression** | 0.6824 | 0.2866 | 0.1430 | 81.09% | 0.0000 | 0.00% | 0.00% |
+| **Random Forest** | 0.6835 | 0.3078 | 0.1421 | 80.73% | 0.0000 | 0.00% | 0.00% |
+
+*Key Clinical Insight:* Standard unadjusted 0.5 decision thresholds on imbalanced readmission data (18.73% base rate) cause baseline linear and forest models to predict 0 for all patients, yielding high accuracy (81%) but 0% sensitivity. This demonstrates why accuracy alone is fundamentally misleading in healthcare risk models.
+
+### 4.2 Subgroup Fairness Disparities (Baseline LightGBM on Test Set)
+
+| Demographic Subgroup | Sample Count (N) | Base Readmission Rate | Selection Rate (0.5 threshold) | Subgroup ROC-AUC | Sensitivity (TPR) | Miss Rate (FNR) | False Alarm Rate (FPR) | Expected Calibration Error (ECE) | Small Sample Flag |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **White** | 317 | 17.67% | 1.58% | 0.6556 | 3.57% | 96.43% | 1.15% | 0.0375 | Robust ($N \ge 30$) |
+| **Black** | 110 | 23.64% | 1.82% | 0.7422 | **0.00%** | **100.0%** | 2.38% | 0.0798 | Robust ($N \ge 30$) |
+| **Hispanic** | 78 | 20.51% | 1.28% | 0.6643 | **0.00%** | **100.0%** | 1.61% | 0.0673 | Robust ($N \ge 30$) |
+| **Asian** | 25 | 16.00% | 0.00% | 0.5000 | **0.00%** | **100.0%** | 0.00% | 0.0772 | Warning ($N<30$) |
+| **Other** | 13 | 7.69% | 7.69% | 1.0000 | 100.0% | 0.00% | 0.00% | 0.2324 | High Variance ($N_{\text{pos}}=1$) |
+| **Native American** | 7 | 0.00% | 0.00% | N/A | N/A | N/A | 0.00% | 0.2299 | High Risk ($N_{\text{pos}}=0$) |
+| **Geriatric (65+)** | 208 | 25.96% | 2.40% | 0.6871 | 3.70% | 96.30% | 1.95% | 0.0692 | Robust ($N \ge 30$) |
+| **Middle Age (45-64)** | 176 | 14.77% | 1.14% | 0.5977 | 3.85% | 96.15% | 0.67% | 0.0526 | Robust ($N \ge 30$) |
+| **Young Adult (18-44)**| 118 | 13.56% | 1.69% | 0.7010 | 0.00% | 100.0% | 1.96% | 0.0232 | Robust ($N \ge 30$) |
+| **Pediatric (<18)** | 48 | 14.58% | 0.00% | **0.4530** | 0.00% | 100.0% | 0.00% | **0.1621** | Robust ($N \ge 30$) |
+
+### 4.3 Mitigation Comparison & Trade-Off Summary
+
+All mitigations were tuned on the validation set and tested on the frozen held-out test set:
+
+| Model Variant | Strategy | Overall ROC-AUC | Overall Accuracy | F1-Score | All-Groups $\Delta_{\text{EO}}$ | Robust ($N \ge 30$) $\Delta_{\text{EO}}$ | Mean Subgroup ECE |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline LightGBM** | Unmitigated (0.5 threshold) | **0.6710** | 80.73% | 0.0536 | 1.0000 | 0.0357 | 0.1207 |
+| **Demographic Reweighed** | Pre-processing sample weights | 0.6605 | **81.09%** | 0.0545 | 1.0000 | 0.0357 | 0.1339 |
+| **Subgroup Isotonic Calibrated** | Post-processing calibration | 0.6627 | 80.55% | 0.0360 | **0.1250** | 0.1250 | **0.1004** |
+| **Fairlearn ThresholdOptimized** | Post-processing decision threshold | N/A | 40.91% | **0.3762** | 0.2500 | **0.0714** | N/A |
+
+### Empirical Mitigation Findings:
+1. **Subgroup Isotonic Calibration achieved the most balanced Pareto improvement:** It lowered the mean demographic calibration error from 0.1207 to 0.1004 (-16.8% reduction) and reduced Equal Opportunity Disparity from 1.0000 to 0.1250 (-87.5% reduction) with virtually no loss in global AUC (0.6627 vs 0.6710).
+2. **Threshold Optimization shifts the recall-specificity trade-off:** Fairlearn's post-processing optimizer boosted clinical recall (F1 jumped from 0.0536 to 0.3762), but dropped overall accuracy to 40.91% due to increased false positives. In clinical triage, false alarms consume nursing follow-up resources.
+3. **Sparse Subgroup Behavior:** Small groups (Native American $N=7$) have single-class representation in validation data, requiring explicit fallback to reference-group thresholds rather than unconstrained group-specific optimization.
+
+---
+
+## 5. Ethical & Clinical Safety Warnings
 
 > [!WARNING]
-> **Residual Risk 1: Under-Detection in Pediatric (<18) Cohorts**
-> Despite overall high AUC, the model's sensitivity in patients under 18 years is only 21.43% (78.57% miss rate). **Clinical action:** Disable automated scoring for patients under 18. Pediatric readmissions must use specialized pediatric scoring systems (e.g., Pediatric Risk of Readmission / PRR).
+> **Warning 1: Severe False Negative Risk in Minority Subgroups**
+> Under default decision thresholds, Black, Hispanic, and Asian patients experienced a 100% false negative rate (miss rate), meaning zero high-risk minority patients were flagged for transitional care. Default 0.5 probability thresholds must never be used in production clinical risk stratification.
 
 > [!WARNING]
-> **Residual Risk 2: Intersectional Geriatric Black Male Vulnerability**
-> Intersectional audits show that Geriatric Black Males face an Expected Calibration Error of 0.1796 and a 57.14% miss rate under baseline scoring. **Clinical action:** Clinical discharge coordinators must apply an automated risk floor multiplier of $1.25\times$ for geriatric patients with multiple chronic conditions.
+> **Warning 2: Pediatric Miscalibration**
+> Pediatric patients (<18) face an ECE of 0.1621 and an AUC of only 0.4530 (worse than chance). Automated readmission scoring must be completely disabled for pediatric admissions.
 
 > [!WARNING]
-> **Residual Risk 3: Data Drift & Hospital Setting Shifts**
-> The model was trained and calibrated on synthetic Massachusetts EHR distributions (Synthea). Deploying this model in distinct geographical jurisdictions (e.g., rural community hospitals or academic medical centers with different case mixes) will induce calibration drift. **Clinical action:** Recalibration using local hospital data is mandatory prior to clinical production use.
-
----
-
-## 7. Model Governance & Maintenance Plan
-- **Audit Cadence:** Monthly automated subgroup fairness reviews via PySpark batch jobs.
-- **Trigger for Retraining:** Any drift where $\Delta_{\text{EO}} > 0.40$ or mean subgroup $\text{ECE} > 0.12$ across any single demographic stratum.
-- **Human Oversight:** All algorithmic high-risk flags must be confirmed by an attending case manager prior to scheduling home nurse deployment.
+> **Warning 3: Operational Constraints of Group-Specific Post-Processing**
+> While subgroup-specific decision thresholds reduce measured disparities mathematically, applying different clinical risk cutoffs based on a patient's race or ethnicity carries legal, regulatory, and ethical challenges in healthcare delivery. Calibrated risk probabilities coupled with clinical judgment are strongly preferred over rigid group-based cutoffs.

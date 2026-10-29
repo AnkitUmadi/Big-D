@@ -1,13 +1,24 @@
 import os
 import json
 import subprocess
-import shutil
+from pathlib import Path
 
-base_dir = r"C:\Users\Ankit Umadi\Documents\big\reports"
+base_dir = os.path.dirname(os.path.abspath(__file__))
 md_path = os.path.join(base_dir, "technical_report.md")
 html_path = os.path.join(base_dir, "technical_report_printable.html")
 pdf_output = os.path.join(base_dir, "technical_report.pdf")
-chrome_path = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+
+chrome_candidates = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+]
+chrome_path = None
+for p in chrome_candidates:
+    if os.path.exists(p):
+        chrome_path = p
+        break
 
 with open(md_path, "r", encoding="utf-8") as f:
     md_content = f.read()
@@ -70,20 +81,23 @@ html_template = f"""<!DOCTYPE html>
 with open(html_path, "w", encoding="utf-8") as f:
     f.write(html_template)
 
-cmd = [
-    chrome_path,
-    "--headless=new",
-    "--disable-gpu",
-    "--no-pdf-header-footer",
-    "--virtual-time-budget=9000",
-    "--run-all-compositor-stages-before-draw",
-    f"--print-to-pdf={pdf_output}",
-    html_path
-]
+if chrome_path:
+    cmd = [
+        chrome_path,
+        "--headless=new",
+        "--disable-gpu",
+        "--no-pdf-header-footer",
+        "--virtual-time-budget=9000",
+        "--run-all-compositor-stages-before-draw",
+        f"--print-to-pdf={pdf_output}",
+        html_path
+    ]
 
-print("Executing Chrome headless PDF render...")
-res = subprocess.run(cmd, capture_output=True, text=True)
-if os.path.exists(pdf_output):
-    print(f"Success! PDF generated at: {pdf_output} ({os.path.getsize(pdf_output)/1024:.1f} KB)")
+    print(f"Executing headless browser PDF render with: {chrome_path}")
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if os.path.exists(pdf_output):
+        print(f"Success! PDF generated at: {pdf_output} ({os.path.getsize(pdf_output)/1024:.1f} KB)")
+    else:
+        print("PDF generation failed:", res.stdout, res.stderr)
 else:
-    print("PDF generation failed:", res.stdout, res.stderr)
+    print("No Chrome or Edge binary found to generate PDF.")

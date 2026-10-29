@@ -41,3 +41,15 @@ data/proc_bench_*
 # macOS / Windows
 .DS_Store
 Thumbs.db
+
+# Generated analytical data
+data/processed/
+
+# Local Hadoop runtime binaries
+hadoop/bin/
+
+# Model artifacts
+models/saved/
+
+# Temporary generated report
+reports/technical_report_printable.html

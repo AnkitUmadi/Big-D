@@ -3,7 +3,7 @@
 **Course:** Big Data Systems & Responsible AI Engineering (BDSRAE)  
 **Department:** Computer Science & Engineering (AI & ML), PES University  
 **Topic 19:** Subgroup Performance in Healthcare Risk Models  
-**Faculty Evaluator:** Dr. Manjula Devananda  
+**Faculty Evaluator:** Dr. Manjula Devananda, Professor, Dept. of CSE (AI & ML)  
 **Team Members:**  
 - **Ankith Umadi** (PES1UG24AM422)  
 - **Haneesh E** (PES1UG24AM471)  
@@ -24,7 +24,7 @@
 - **Speaker:** Ankith Umadi
 - **Key Talking Points:**
   - Introduce team, SRNs, and project topic.
-  - State the central thesis: Aggregate metrics in clinical machine learning hide life-threatening subgroup disparities; combining Big Data distributed engineering with Responsible AI auditing is necessary for safe deployment.
+  - State central thesis: Aggregate metrics in clinical machine learning hide life-threatening subgroup disparities; combining Big Data distributed engineering with Responsible AI auditing is necessary for equitable clinical deployment.
 
 ---
 
@@ -35,48 +35,50 @@
   - The Core Dilemma: False Negatives ($\text{FN}$) kill—patients discharged unmonitored experience acute decompensation. Miscalibration distorts triage tier thresholds.
 - **Speaker:** Ankith Umadi
 - **Key Talking Points:**
-  - Explain why 30-day readmissions are the gold standard quality and reimbursement metric.
-  - Explain the asymmetric cost of errors in healthcare: false alarms cost a \$20 phone call; missed readmissions cost \$15,000+ in emergency care and risk patient mortality.
+  - 30-day readmissions are the primary quality and reimbursement metric.
+  - Asymmetric error costs: false alarms cost a modest phone check-in; missed readmissions cost tens of thousands in emergency care and compromise patient survival.
 
 ---
 
 ## Slide 3: Big Data Systems Architecture & Parquet Lakehouse (1:30 – 2:30)
 - **Slide Content:**
-  - Architecture Diagram: Synthea Relational CSVs -> PySpark Distributed ETL -> Partitioned Parquet Lakehouse (`age_group`, `race`) -> Feature Store.
-  - Technical Details:
-    - PySpark Window Functions: `Window.partitionBy("patient_id").orderBy("enc_start")` for longitudinal readmission target derivation.
-    - Distributed Joins across encounters, conditions (SNOMED-CT), medications (RxNorm), and procedures.
+  - Architecture Diagram: Synthea-style Relational CSVs -> PySpark Distributed ETL -> Partitioned Parquet Lakehouse (`[age_group, race]`) -> Analytical Cohort.
+  - Technical Implementation:
+    - Distributed Window Analytics: Self-join and chronological filtering for leak-free readmission target construction.
+    - Censor Handling: Identifying encounters within 30 days of study horizon without readmission.
+    - Leak-Free Feature Aggregation: Strict cutoff at index discharge.
 - **Speaker:** Ankith Umadi
 - **Key Talking Points:**
-  - Address Requirement 1 (Big Data systems design).
-  - Highlight the partitioned Lakehouse design: partitioning on demographic audit axes enables predicate pushdown, allowing instant isolation of subgroup cohorts without full table scans.
+  - Fulfills Big Data systems mandate with industrial-grade PySpark distributed execution.
+  - Partitioned Lakehouse design (`[age_group, race]`) enables predicate pushdown and rapid subgroup partition pruning.
 
 ---
 
 ## Slide 4: Measured Big Data Scalability Evidence (2:30 – 3:30)
 - **Slide Content:**
   - Benchmark Table & Plots (`reports/figures/big_data_scaling.png`).
-  - Empirical Evidence Metrics:
-    - Storage Footprint: 43.9 MB CSV -> 1.4 MB Parquet (**$30.5\times$ compression ratio**).
-    - Throughput: Scaling from 1,528 rec/s at 5k patients to **5,631 rec/s at 20k patients**.
-    - Linear scaling latency: Runtime remains nearly flat (3.27s vs 3.55s) due to distributed Spark partition amortization.
+  - Empirical Evidence Metrics (PySpark 4.2.1, 16 CPU Cores, 23.7 GB RAM):
+    - Storage Compression: 13.1 MB CSV -> 0.24 MB Parquet (**53.7x compression ratio**).
+    - Throughput: Scaling to **1,047.3 patients/second** on local multi-threading.
+    - Reproducible, isolated benchmarks with automatic directory cleanup.
 - **Speaker:** Ankith Umadi
 - **Key Talking Points:**
-  - Emphasize Dr. Manjula's mandate for *measured evidence rather than description alone*.
-  - Explain how Snappy columnar compression and Spark partition execution provide industrial-grade scalability.
+  - Demonstrates empirical scalability benchmarking satisfying course requirements.
+  - Highlights how Snappy columnar compression dramatically reduces storage footprint.
 
 ---
 
-## Slide 5: Baseline Healthcare Risk Models (3:30 – 4:15)
+## Slide 5: Baseline Healthcare Risk Models & The Accuracy Paradox (3:30 – 4:15)
 - **Slide Content:**
-  - Model Architectures Evaluated: LightGBM, Logistic Regression, Random Forest.
-  - Overall Test Performance Table:
-    - LightGBM: ROC-AUC = 0.9010 | PR-AUC = 0.6679 | Accuracy = 82.82% | Brier Score = 0.0999.
-    - Logistic Regression: ROC-AUC = 0.8910 | Accuracy = 81.50%.
+  - Models Evaluated on Patient-Independent Splits (Train 70%, Val 15%, Test 15%):
+    - LightGBM, Logistic Regression, Random Forest.
+  - Overall Test Performance Table (N = 550 Encounters across 343 Patients):
+    - LightGBM: ROC-AUC = 0.6710 | PR-AUC = 0.3057 | Accuracy = 80.73% | Brier Score = 0.1437.
+    - Logistic Regression: ROC-AUC = 0.6824 | Accuracy = 81.09%.
+    - Random Forest: ROC-AUC = 0.6835 | Accuracy = 80.73%.
 - **Speaker:** Haneesh E
 - **Key Talking Points:**
-  - On the surface, the baseline gradient-boosted tree model appears state-of-the-art with an AUC exceeding 0.90.
-  - Transition to: "Why this number is dangerously deceptive."
+  - The "Accuracy Paradox": models achieve ~81% accuracy, but near-zero sensitivity under default 0.5 thresholds on imbalanced readmission data.
 
 ---
 
@@ -84,88 +86,66 @@
 - **Slide Content:**
   - Subgroup Disparity Table & Bar Chart (`reports/figures/subgroup_disparities.png`).
   - Key Findings Highlighted:
-    - Pediatric (<18): Sensitivity drops to **21.43%** (**78.57% miss rate**).
-    - Middle Age (45–64): Sensitivity is **45.16%** (**54.84% miss rate**).
-    - Native American: Sensitivity drops to **0.00%** (**100% of readmitted patients missed**).
-    - Equal Opportunity Disparity: **$\Delta_{\text{EO}} = 0.7500$**.
+    - Black ($N=110$), Hispanic ($N=78$), and Asian ($N=25$): Sensitivity collapses to **0.0%** (100% false negatives under default cutoff).
+    - Pediatric (<18): Discrimination collapses to **ROC-AUC = 0.4530** (worse than chance).
+    - Geriatric (65+): High base rate (25.96%), sensitivity only 3.70%.
 - **Speaker:** Haneesh E
 - **Key Talking Points:**
-  - Walk through the clinical meaning of these numbers: under empirical risk minimization, the model prioritizes majority loss reduction and completely ignores low-prevalence demographics.
+  - Default decision thresholds completely abandon minority high-risk patients.
+  - Proves that adult clinical models cannot be generalized to pediatric populations.
 
 ---
 
-## Slide 7: Subgroup Calibration Disparities (ECE) (5:30 – 6:30)
+## Slide 7: Subgroup Calibration Disparities (ECE) & Intersectional Analysis (5:30 – 6:30)
 - **Slide Content:**
   - Subgroup Expected Calibration Error Table.
-  - Reliability Diagrams (`reports/figures/calibration_comparison.png`).
-  - Key Disparities:
-    - White Patients: ECE = **0.0287** (well-calibrated).
-    - Asian Patients: ECE = **0.1107** ($4\times$ worse; predicted risk 16.17% vs observed 8.51%).
-    - Native American: ECE = **0.2319**, MCE = **0.7562**.
-- **Speaker:** Haneesh E
-- **Key Talking Points:**
-  - Explain why calibration matters more than classification accuracy in medicine: clinical triage relies on risk tiers. Over-estimating Asian risk wastes hospital beds; under-estimating minority risk leads to fatal discharges.
-
----
-
-## Slide 8: Intersectional Compounded Harms (6:30 – 7:15)
-- **Slide Content:**
   - Intersectional ECE Heatmap (`reports/figures/intersectional_ece_heatmap.png`).
-  - Worst Pockets:
-    - **Geriatric Black Males**: ECE = **0.1796**, Sensitivity = **42.86%** (Miss rate 57.14%).
-    - **Middle-Age White Females**: Sensitivity = **34.78%** (Miss rate 65.22%).
+  - Key Intersectional Failures:
+    - Geriatric Hispanic Females: Base Rate 28.57%, **$\text{ECE} = 0.2514$**, 100% miss rate.
+    - Pediatric Black Females: Base Rate 27.27%, **$\text{ECE} = 0.2312$**, 100% miss rate.
+    - Geriatric Black Males: Base Rate 38.10%, **$\text{ECE} = 0.1908$**, 100% miss rate.
 - **Speaker:** Haneesh E
 - **Key Talking Points:**
-  - Demonstrate that aggregate one-dimensional audits miss compounded intersectional vulnerabilities (Simpson's Paradox in algorithmic bias).
+  - Explain why probability calibration is the cornerstone of clinical triage.
+  - Single-axis audits conceal compounding harms that explode at demographic intersections.
 
 ---
 
-## Slide 9: Responsible AI Mitigation Suite (7:15 – 8:15)
+## Slide 8: Algorithmic Bias Mitigation Strategies (6:30 – 7:30)
 - **Slide Content:**
-  - Three Mitigation Paradigms:
-    1. Pre-Processing: Demographic Reweighing.
-    2. Post-Processing: Subgroup Isotonic Calibration.
-    3. Post-Processing: Fairlearn ThresholdOptimizer (Equalized Odds).
-  - Before/After Comparison Table:
-    - $\Delta_{\text{EO}}$ drops from **0.7500 to 0.3333** (**55.6% reduction in disparity**).
-    - ROC-AUC remains rock-solid at **0.9010**; overall accuracy dips by only 2.75%.
+  - Three Mitigation Architectures:
+    1. Pre-Processing: Demographic Sample Reweighing (fitted on training data).
+    2. Post-Processing: Subgroup Isotonic Calibration (fitted on validation data).
+    3. Post-Processing: Fairlearn ThresholdOptimizer for Equal Opportunity (fitted on validation data).
+  - Methodological rigor: zero test-set leakage during tuning; fallback for sparse single-class groups.
 - **Speaker:** Vikas R
 - **Key Talking Points:**
-  - Detail how threshold optimization dynamically adjusts the decision threshold per demographic group to ensure equal opportunity in post-discharge intervention.
+  - Explain the difference between probability calibration and threshold shifting.
+  - Emphasize that all mitigators were tuned on an independent validation set and evaluated on frozen test data.
 
 ---
 
-## Slide 10: Fairness-Utility Pareto Frontier & Model Card Governance (8:15 – 9:15)
+## Slide 9: Mitigation Trade-Off Evaluation & Pareto Frontier (7:30 – 8:30)
 - **Slide Content:**
-  - Pareto Frontier Scatter Plot (`reports/figures/fairness_utility_tradeoff.png`).
-  - Model Card & Clinical Governance Highlights:
-    - Intended Use: Clinical discharge planning decision support.
-    - Prohibited Use: Automated care denial or insurance claims adjudication.
-    - Residual Risk Warnings: Disable automated scoring for pediatric cohorts (<18); require human-in-the-loop verification.
+  - Mitigation Trade-Off Summary Table & Pareto Plot (`reports/figures/fairness_utility_tradeoff.png`).
+  - Comparative Results on Held-Out Test Set:
+    - Subgroup Isotonic Calibration: Reduces mean subgroup ECE from **0.1207 to 0.1004** (-16.8%) and cuts Equal Opportunity Disparity from **1.0000 to 0.1250** (-87.5% reduction) with virtually zero loss in discrimination (AUC 0.6627 vs 0.6710).
+    - Fairlearn Threshold Optimization: Shifting decision cutoffs boosts F1-score from **0.0536 to 0.3762**, increasing high-risk recall at the expense of accuracy (40.91%).
 - **Speaker:** Vikas R
 - **Key Talking Points:**
-  - Demonstrate that Responsible AI does not require sacrificing clinical predictive power.
-  - Explain how Model and Data Cards operationalize accountability and governance.
+  - Subgroup calibration delivers the most balanced Pareto improvement for clinical decision support.
+  - Transparent trade-off reporting: we acknowledge that aggressive threshold post-processing increases false alarms.
 
 ---
 
-## Slide 11: Summary of Deliverables & Live System Architecture (9:15 – 9:45)
+## Slide 10: Model Governance, Safety Warnings & Conclusion (8:30 – 9:30)
 - **Slide Content:**
-  - Deliverables Matrix:
-    - GitHub Repository with reproducible PySpark scripts & Docker Compose.
-    - Pre-executed Results Notebook (`subgroup_risk_analysis.ipynb`).
-    - 3-5 Page Technical Report, Model Card, Data Card, and Demo Video Script.
-  - Summary of Impact: Bridging Big Data high-throughput lakehouse storage with Responsible AI clinical fairness.
+  - Model Card (Mitchell et al.) & Data Card (Gebru et al.) deliverables.
+  - Mandatory Safety Warnings:
+    - Automated scoring strictly prohibited for pediatric patients (<18).
+    - Decision support only; never to be used for denying care or insurance claims.
+  - Summary of Deliverables: Docker setup, unit test suite (10/10 passed), reproducibility commands.
 - **Speaker:** Vikas R
-
----
-
-## Slide 12: Conclusion & Q&A Defense Preparation (9:45 – 10:00)
-- **Slide Content:**
-  - "Thank you. We are open for questions."
-  - Team Contact: `ankith.umadi@pes.edu`, `haneesh.e@pes.edu`, `vikas.r@pes.edu`.
-- **Potential Evaluator Questions & Prepared Answers:**
-  - *Q: Why choose Equal Opportunity over Demographic Parity in healthcare?*  
-    **A:** In disease readmission, baseline illness prevalence differs across age and chronic disease groups. Demographic Parity would force equal readmission rates across healthy young and multimorbid elderly patients, which is medically invalid. Equal Opportunity ensures that *given* a patient is going to readmit, their probability of being detected and protected is equal regardless of race or age.
-  - *Q: How does PySpark help Responsible AI?*  
-    **A:** Big Data lakehouse partitioning by demographic attributes enables sub-second partition pruning, allowing real-time subgroup audits over millions of patient records without scanning unneeded data.
+- **Key Talking Points:**
+  - Responsible AI engineering requires governance and intended-use boundaries, not just mathematical algorithms.
+  - Conclude with project impact and invite faculty questions.

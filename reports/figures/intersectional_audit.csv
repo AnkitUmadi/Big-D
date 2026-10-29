@@ -1,9 +1,20 @@
-intersectional_group,age_group,race,gender,n_samples,base_rate,selection_rate,roc_auc,tpr_sensitivity,fnr_miss_rate,fpr,ece,brier_score
-Geriatric (65+) | Black | Male,Geriatric (65+),Black,Male,30,0.2333,0.2333,0.882,0.4286,0.5714,0.1739,0.1796,0.1183
-Middle Age (45-64) | Black | Male,Middle Age (45-64),Black,Male,33,0.3333,0.2727,0.876,0.5455,0.4545,0.1364,0.1161,0.127
-Middle Age (45-64) | White | Female,Middle Age (45-64),White,Female,94,0.2447,0.1915,0.8524,0.3478,0.6522,0.1408,0.1124,0.1287
-Geriatric (65+) | White | Male,Geriatric (65+),White,Male,98,0.2551,0.2857,0.8932,0.72,0.28,0.137,0.0879,0.1135
-Middle Age (45-64) | White | Male,Middle Age (45-64),White,Male,81,0.1605,0.0988,0.9106,0.3846,0.6154,0.0441,0.0666,0.0957
-Young Adult (18-44) | White | Male,Young Adult (18-44),White,Male,54,0.1852,0.0926,0.9477,0.4,0.6,0.0227,0.064,0.0698
-Young Adult (18-44) | White | Female,Young Adult (18-44),White,Female,78,0.1282,0.141,0.9632,0.7,0.3,0.0588,0.0556,0.0554
-Geriatric (65+) | White | Female,Geriatric (65+),White,Female,90,0.2889,0.2556,0.8888,0.6154,0.3846,0.1094,0.0427,0.1172
+intersectional_group,age_group,race,gender,n_samples,small_sample_flag,base_rate,selection_rate,roc_auc,tpr_sensitivity,fnr_miss_rate,fpr,ece,brier_score
+Geriatric (65+) | Hispanic | Female,Geriatric (65+),Hispanic,Female,21,True,0.2857,0.0476,0.6,0.0,1.0,0.0667,0.2514,0.2171
+Pediatric (<18) | Black | Female,Pediatric (<18),Black,Female,11,True,0.2727,0.0,0.5833,0.0,1.0,0.0,0.2312,0.1906
+Middle Age (45-64) | Hispanic | Female,Middle Age (45-64),Hispanic,Female,10,True,0.3,0.0,0.5714,0.0,1.0,0.0,0.2014,0.2271
+Young Adult (18-44) | Hispanic | Female,Young Adult (18-44),Hispanic,Female,10,True,0.0,0.0,,,,0.0,0.1939,0.0422
+Geriatric (65+) | Black | Male,Geriatric (65+),Black,Male,21,True,0.381,0.0,0.8077,0.0,1.0,0.0,0.1908,0.2094
+Pediatric (<18) | White | Female,Pediatric (<18),White,Female,13,True,0.0769,0.0,0.1667,0.0,1.0,0.0,0.1835,0.0916
+Pediatric (<18) | White | Male,Pediatric (<18),White,Male,10,True,0.1,0.0,0.5556,0.0,1.0,0.0,0.1648,0.1132
+Geriatric (65+) | Black | Female,Geriatric (65+),Black,Female,19,True,0.3158,0.0,0.8846,0.0,1.0,0.0,0.1447,0.1772
+Geriatric (65+) | Hispanic | Male,Geriatric (65+),Hispanic,Male,19,True,0.3158,0.0,0.6026,0.0,1.0,0.0,0.1394,0.2161
+Middle Age (45-64) | Black | Female,Middle Age (45-64),Black,Female,16,True,0.0625,0.0,0.6667,0.0,1.0,0.0,0.1302,0.0758
+Geriatric (65+) | White | Female,Geriatric (65+),White,Female,47,False,0.2128,0.0213,0.5622,0.0,1.0,0.027,0.1239,0.1722
+Middle Age (45-64) | Black | Male,Middle Age (45-64),Black,Male,16,True,0.125,0.0625,0.6071,0.0,1.0,0.0714,0.1186,0.1258
+Middle Age (45-64) | White | Male,Middle Age (45-64),White,Male,45,False,0.1111,0.0,0.465,0.0,1.0,0.0,0.1184,0.112
+Middle Age (45-64) | Hispanic | Male,Middle Age (45-64),Hispanic,Male,11,True,0.0909,0.0,1.0,0.0,1.0,0.0,0.1036,0.0683
+Young Adult (18-44) | Black | Female,Young Adult (18-44),Black,Female,15,True,0.2,0.0667,0.6389,0.0,1.0,0.0833,0.0963,0.1731
+Young Adult (18-44) | White | Male,Young Adult (18-44),White,Male,30,False,0.0667,0.0333,0.6429,0.0,1.0,0.0357,0.0902,0.076
+Middle Age (45-64) | White | Female,Middle Age (45-64),White,Female,66,False,0.2121,0.0152,0.6593,0.0714,0.9286,0.0,0.0848,0.1557
+Young Adult (18-44) | White | Female,Young Adult (18-44),White,Female,43,False,0.186,0.0,0.75,0.0,1.0,0.0,0.0713,0.1378
+Geriatric (65+) | White | Male,Geriatric (65+),White,Male,63,False,0.2381,0.0317,0.7333,0.0667,0.9333,0.0208,0.0603,0.1596

@@ -104,34 +104,44 @@ def plot_calibration_comparison(baseline_curves, mitigated_curves, output_path="
 
 def plot_fairness_utility_pareto(df_tradeoff, output_path="reports/figures/fairness_utility_tradeoff.png"):
     """
-    Plots the Fairness-Utility Pareto frontier (ROC-AUC vs Equal Opportunity Disparity).
+    Plots the Fairness-Utility Pareto comparison (Utility vs Equal Opportunity Disparity).
+    Handles both probability models and threshold optimization.
     """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(9, 6))
 
-    colors = {"Baseline": "#d62728", "Reweighted": "#ff7f0e", "SubgroupCalibrated": "#1f77b4", "ThresholdOptimized": "#2ca02c"}
-    
+    colors = {
+        "Baseline": "#d62728",
+        "Reweighted": "#ff7f0e",
+        "SubgroupCalibrated": "#1f77b4",
+        "ThresholdOptimized": "#2ca02c",
+        "ThresholdOptimized_EO": "#2ca02c"
+    }
+
+    plot_y = "accuracy" if df_tradeoff["roc_auc"].isna().any() else "roc_auc"
+    y_label = "Overall Accuracy (Higher is Better)" if plot_y == "accuracy" else "Global ROC-AUC (Higher is Better)"
+
     for _, row in df_tradeoff.iterrows():
-        name = row["model_variant"]
-        c = colors.get(name, "#333333")
-        ax.scatter(row["equal_opportunity_difference"], row["roc_auc"], color=c, s=160, zorder=5, label=name)
+        name = str(row["model_variant"])
+        c = colors.get(name, colors.get(name.split("_")[0], "#333333"))
+        eo_val = row["equal_opportunity_difference"]
+        y_val = row[plot_y]
+
+        ax.scatter(eo_val, y_val, color=c, s=160, zorder=5, label=name)
+        auc_str = f"AUC: {row['roc_auc']:.3f}" if pd.notna(row['roc_auc']) else "AUC: N/A"
         ax.annotate(
-            f"  {name}\n  (AUC: {row['roc_auc']:.3f}, EO Diff: {row['equal_opportunity_difference']:.3f})",
-            (row["equal_opportunity_difference"], row["roc_auc"]),
-            fontsize=9, fontweight="bold", verticalalignment="center"
+            f"  {name}\n  (Acc: {row['accuracy']:.3f}, {auc_str}\n   EO Diff: {eo_val:.3f})",
+            (eo_val, y_val),
+            fontsize=8.5, fontweight="bold", verticalalignment="center"
         )
 
-    ax.set_title("Responsible AI Trade-off: Overall Utility vs. Equal Opportunity Disparity", fontsize=12, fontweight="bold")
+    ax.set_title("Responsible AI Trade-off: Utility vs. Equal Opportunity Disparity", fontsize=12, fontweight="bold")
     ax.set_xlabel("Equal Opportunity Disparity [Max(TPR) - Min(TPR)] (Lower is Fairer)", fontsize=11)
-    ax.set_ylabel("Global ROC-AUC (Higher is Better)", fontsize=11)
+    ax.set_ylabel(y_label, fontsize=11)
     ax.grid(True, linestyle="--", alpha=0.5)
-    
-    # Shade ideal zone
-    min_eo = df_tradeoff["equal_opportunity_difference"].min()
-    max_auc = df_tradeoff["roc_auc"].max()
-    ax.axvspan(0.0, 0.10, color="green", alpha=0.08, label="Acceptable Disparity Zone (<0.10)")
 
-    ax.legend(loc="lower left", frameon=True)
+    ax.axvspan(0.0, 0.15, color="green", alpha=0.08, label="Low Disparity Region (<0.15)")
+    ax.legend(loc="lower left", frameon=True, fontsize=9)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300)
     plt.close()
