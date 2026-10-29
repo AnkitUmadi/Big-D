@@ -11,7 +11,7 @@
 > **Faculty Guide:** Dr. Manjula Devananda, Professor, Dept. of CSE (AI & ML)  
 >
 > **Team Members:**  
-> - **Ankith Umadi** — SRN: `PES1UG24AM422`  
+> - **Ankit Umadi** — SRN: `PES1UG24AM422`  
 > - **Haneesh E** — SRN: `PES1UG24AM471`  
 > - **Vikas R** — SRN: `PES1UG24AM477`  
 
